@@ -1,5 +1,12 @@
 {
 	"comment": "",
+	"heroku": {
+		"goVersion": "go1.9",
+		"install": [
+			"./...",
+			"./cmd/..."
+		]
+	},
 	"ignore": "test",
 	"package": [
 		{
