@@ -1,0 +1,6 @@
+.exe
+*.test
+*.prof
+vendor/*/
+CurrencyTracker
+.vscode/*
