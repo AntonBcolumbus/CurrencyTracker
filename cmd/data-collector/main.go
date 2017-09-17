@@ -8,6 +8,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/AntonBcolumbus/CurrencyTracker/datamodels"
+
 	"gopkg.in/mgo.v2/bson"
 
 	mgo "gopkg.in/mgo.v2"
@@ -49,7 +51,7 @@ func main() {
 		log.Fatalf("tinkoff request body reading failed: %s", err.Error())
 	}
 
-	data := &TinkoffData{}
+	data := &datamodels.TinkoffData{}
 	json.Unmarshal(body, &data)
 
 	session.SetMode(mgo.Monotonic, true)

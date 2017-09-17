@@ -15,7 +15,7 @@ type Payload struct {
 
 // LastUpdate ...
 type LastUpdate struct {
-	Milliseconds uint64 `json:"milliseconds,omitempty"`
+	Milliseconds int64 `json:"milliseconds,omitempty"`
 }
 
 // Rate ...

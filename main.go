@@ -2,11 +2,16 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
+	mgo "gopkg.in/mgo.v2"
+
+	"github.com/AntonBcolumbus/CurrencyTracker/datamodels"
 	"github.com/gorilla/mux"
 )
 
@@ -64,64 +69,67 @@ type Cell struct {
 
 func getData(w http.ResponseWriter, r *http.Request) {
 
-	data := Dataset{}
-	data.Cols = []Col{
-		Col{Label: "Day", Type: "number"},
-		Col{Label: "Guardians of the Galaxy", Type: "number"},
+	data := getMongoData()
+
+	dataToSend := Dataset{}
+	dataToSend.Cols = []Col{
+		Col{Label: "Day", Type: "datetime"},
 		Col{Type: "string", P: map[string]string{"role": "annotation"}},
 		Col{Type: "string", P: map[string]string{"role": "annotationText"}},
+		Col{Label: "EUR - RUB", Type: "number"},
+		Col{Type: "string", P: map[string]string{"role": "annotation"}},
 	}
-	data.Rows = []Row{
-		Row{
-			C: []Cell{
-				Cell{V: 1},
-				Cell{V: 37.8},
-				Cell{V: "37.8"},
-				Cell{V: "37.8"},
+	dataToSend.Rows = make([]Row, 0, 0)
+
+	for _, d := range data {
+		c := Cell{}
+		for _, r := range d.Payload.Rates {
+			if r.Category == "SMETransferBelow10" && r.FromCurrency.Code == 978 && r.ToCurrency.Code == 643 {
+				c.V = r.Buy
+			}
+		}
+		row := Row{}
+		t := time.Unix(0, d.Payload.LastUpdate.Milliseconds*int64(time.Millisecond))
+		row.C = []Cell{
+			Cell{
+				V: fmt.Sprintf("Date(%d,%d,%d,%d,%d)", t.Year(), t.Month()-1, t.Day(), t.Hour(), t.Minute()),
 			},
-		},
-		Row{
-			C: []Cell{
-				Cell{V: 2},
-				Cell{V: 30.9},
-				Cell{V: "30.9"},
-				Cell{V: "30.9"},
+			Cell{
+				V: t.Format("02.01.2006 15:04"),
 			},
-		},
-		Row{
-			C: []Cell{
-				Cell{V: 3},
-				Cell{V: 25.4},
-				Cell{V: "25.4"},
-				Cell{V: "25.4"},
+			Cell{
+				V: t.Format("02.01.2006 15:04"),
 			},
-		},
-		Row{
-			C: []Cell{
-				Cell{V: 4},
-				Cell{V: 11.7},
-				Cell{V: "11.7"},
-				Cell{V: "11.7"},
+			c,
+			Cell{
+				V: fmt.Sprintf("%v", c.V),
 			},
-		},
-		Row{
-			C: []Cell{
-				Cell{V: 5},
-				Cell{V: 11.9},
-				Cell{V: "11.9"},
-				Cell{V: "11.9"},
-			},
-		},
-		Row{
-			C: []Cell{
-				Cell{V: 6},
-				Cell{V: 8.8},
-				Cell{V: "8.8"},
-				Cell{V: "8.8"},
-			},
-		},
+		}
+		dataToSend.Rows = append(dataToSend.Rows, row)
 	}
 
-	d, _ := json.Marshal(data)
+	d, _ := json.Marshal(dataToSend)
 	w.Write(d)
+}
+
+func getMongoData() []*datamodels.TinkoffData {
+	url := os.Getenv("MONGODB_URI")
+	if url == "" {
+		url = "mongodb://heroku_k99bcr9h:vo2e0n2drkk3do41t2q9lvh6av@ds141024.mlab.com:41024/heroku_k99bcr9h"
+	}
+	session, err := mgo.Dial(url)
+	if err != nil {
+		log.Fatalf("mongo connection failed: %s", err.Error())
+	}
+	defer session.Close()
+
+	session.SetMode(mgo.Monotonic, true)
+
+	c := session.DB("heroku_k99bcr9h").C("tinkoff")
+	var result []*datamodels.TinkoffData
+	err = c.Find(nil).All(&result)
+	if err != nil {
+		log.Fatalf("mongo find failed: %s", err.Error())
+	}
+	return result
 }
