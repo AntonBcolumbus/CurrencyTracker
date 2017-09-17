@@ -3,4 +3,5 @@
 *.prof
 vendor/*/
 CurrencyTracker
+data-collector
 .vscode/*
