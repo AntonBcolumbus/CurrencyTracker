@@ -78,14 +78,28 @@ func getData(w http.ResponseWriter, r *http.Request) {
 		Col{Label: "Day", Type: "datetime"},
 		Col{Label: "EUR - RUB", Type: "number"},
 		Col{Type: "string", P: map[string]string{"role": "annotation"}},
+		Col{Label: "USD - RUB", Type: "number"},
+		Col{Type: "string", P: map[string]string{"role": "annotation"}},
 	}
 	dataToSend.Rows = make([]Row, 0, 0)
 
 	for _, d := range data {
-		c := Cell{}
+		eurC := Cell{}
+		usdC := Cell{}
+		var eurFound, usdFound bool = false, false
 		for _, r := range d.Payload.Rates {
 			if r.Category == "SMETransferBelow10" && r.FromCurrency.Code == 978 && r.ToCurrency.Code == 643 {
-				c.V = r.Buy
+				eurC.V = r.Buy
+				eurFound = true
+				continue
+			}
+			if r.Category == "SMETransferBelow10" && r.FromCurrency.Code == 840 && r.ToCurrency.Code == 643 {
+				usdC.V = r.Buy
+				usdFound = true
+				continue
+			}
+			if usdFound && eurFound {
+				break
 			}
 		}
 		row := Row{}
@@ -96,9 +110,13 @@ func getData(w http.ResponseWriter, r *http.Request) {
 			Cell{
 				V: fmt.Sprintf("Date(%d,%d,%d,%d,%d)", t.Year(), t.Month()-1, t.Day(), t.Hour(), t.Minute()),
 			},
-			c,
+			eurC,
 			Cell{
-				V: fmt.Sprintf("%v", c.V),
+				V: fmt.Sprintf("%v", eurC.V),
+			},
+			usdC,
+			Cell{
+				V: fmt.Sprintf("%v", usdC.V),
 			},
 		}
 		dataToSend.Rows = append(dataToSend.Rows, row)
