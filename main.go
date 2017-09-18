@@ -9,6 +9,8 @@ import (
 	"os"
 	"time"
 
+	"gopkg.in/mgo.v2/bson"
+
 	mgo "gopkg.in/mgo.v2"
 
 	"github.com/AntonBcolumbus/CurrencyTracker/datamodels"
@@ -74,8 +76,6 @@ func getData(w http.ResponseWriter, r *http.Request) {
 	dataToSend := Dataset{}
 	dataToSend.Cols = []Col{
 		Col{Label: "Day", Type: "datetime"},
-		Col{Type: "string", P: map[string]string{"role": "annotation"}},
-		Col{Type: "string", P: map[string]string{"role": "annotationText"}},
 		Col{Label: "EUR - RUB", Type: "number"},
 		Col{Type: "string", P: map[string]string{"role": "annotation"}},
 	}
@@ -89,16 +89,12 @@ func getData(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		row := Row{}
-		t := time.Unix(0, d.Payload.LastUpdate.Milliseconds*int64(time.Millisecond))
+		t := time.Unix(0, d.Payload.LastUpdate.Milliseconds*int64(time.Millisecond)).UTC()
+		loc, _ := time.LoadLocation("Europe/Moscow")
+		t = t.In(loc)
 		row.C = []Cell{
 			Cell{
 				V: fmt.Sprintf("Date(%d,%d,%d,%d,%d)", t.Year(), t.Month()-1, t.Day(), t.Hour(), t.Minute()),
-			},
-			Cell{
-				V: t.Format("02.01.2006 15:04"),
-			},
-			Cell{
-				V: t.Format("02.01.2006 15:04"),
 			},
 			c,
 			Cell{
@@ -127,7 +123,16 @@ func getMongoData() []*datamodels.TinkoffData {
 
 	c := session.DB("heroku_k99bcr9h").C("tinkoff")
 	var result []*datamodels.TinkoffData
-	err = c.Find(nil).All(&result)
+	loc, _ := time.LoadLocation("Europe/Moscow")
+	now := time.Now().In(loc)
+
+	millisFrom := time.Date(now.Year(), now.Month(), now.Day(), 10, 0, 0, 0, loc).UnixNano() / int64(time.Millisecond)
+	millisTo := time.Date(now.Year(), now.Month(), now.Day(), 18, 30, 0, 0, loc).UnixNano() / int64(time.Millisecond)
+	err = c.Find(bson.M{
+		"$and": []bson.M{
+			bson.M{"payload.lastupdate.milliseconds": bson.M{"$gte": millisFrom}},
+			bson.M{"payload.lastupdate.milliseconds": bson.M{"$lte": millisTo}},
+		}}).All(&result)
 	if err != nil {
 		log.Fatalf("mongo find failed: %s", err.Error())
 	}
