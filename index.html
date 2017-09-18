@@ -16,7 +16,7 @@
         // draws it.
         function drawChart() {
             var jsonData = $.ajax({
-                url: "getData",
+                url: "getData?currency_name=eur",
                 dataType: "json",
                 async: false
                 }).responseText;
@@ -25,10 +25,26 @@
 
             var options = {
                 title: 'EUR - RUB exchage rate',
-                height: 500
+                height: 400
             };
 
-            var chart = new google.visualization.LineChart(document.getElementById('chart_div'));
+            var chart = new google.visualization.LineChart(document.getElementById('chart_div1'));
+
+            chart.draw(data, options);
+            var jsonData = $.ajax({
+                url: "getData?currency_name=usd",
+                dataType: "json",
+                async: false
+                }).responseText;
+                
+            var data = new google.visualization.DataTable(jsonData);
+
+            var options = {
+                title: 'USD - RUB exchage rate',
+                height: 400
+            };
+
+            var chart = new google.visualization.LineChart(document.getElementById('chart_div2'));
 
             chart.draw(data, options);
         }
@@ -37,6 +53,7 @@
   
     <body>
       <!--Div that will hold the pie chart-->
-      <div id="chart_div"></div>
+      <div id="chart_div1"></div>
+      <div id="chart_div2"></div>
     </body>
   </html>

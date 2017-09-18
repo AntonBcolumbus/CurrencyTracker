@@ -73,35 +73,48 @@ func getData(w http.ResponseWriter, r *http.Request) {
 
 	data := getMongoData()
 
+	currency, _ := getStringFromQuery("currency_name", r)
+
 	dataToSend := Dataset{}
-	dataToSend.Cols = []Col{
-		Col{Label: "Day", Type: "datetime"},
-		Col{Label: "EUR - RUB", Type: "number"},
-		Col{Type: "string", P: map[string]string{"role": "annotation"}},
-		Col{Label: "USD - RUB", Type: "number"},
-		Col{Type: "string", P: map[string]string{"role": "annotation"}},
+	switch currency {
+	case "eur":
+		dataToSend.Cols = []Col{
+			Col{Label: "Day", Type: "datetime"},
+			Col{Label: "EUR - RUB", Type: "number"},
+			Col{Type: "string", P: map[string]string{"role": "annotation"}},
+		}
+	case "usd":
+		dataToSend.Cols = []Col{
+			Col{Label: "Day", Type: "datetime"},
+			Col{Label: "USD - RUB", Type: "number"},
+			Col{Type: "string", P: map[string]string{"role": "annotation"}},
+		}
+	default:
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(fmt.Sprintf("currency '%s' not found", currency)))
 	}
+
 	dataToSend.Rows = make([]Row, 0, 0)
 
 	for _, d := range data {
-		eurC := Cell{}
-		usdC := Cell{}
-		var eurFound, usdFound bool = false, false
-		for _, r := range d.Payload.Rates {
-			if r.Category == "SMETransferBelow10" && r.FromCurrency.Code == 978 && r.ToCurrency.Code == 643 {
-				eurC.V = r.Buy
-				eurFound = true
-				continue
+		c := Cell{}
+		switch currency {
+		case "eur":
+			for _, r := range d.Payload.Rates {
+				if r.Category == "SMETransferBelow10" && r.FromCurrency.Code == 978 && r.ToCurrency.Code == 643 {
+					c.V = r.Buy
+					break
+				}
 			}
-			if r.Category == "SMETransferBelow10" && r.FromCurrency.Code == 840 && r.ToCurrency.Code == 643 {
-				usdC.V = r.Buy
-				usdFound = true
-				continue
-			}
-			if usdFound && eurFound {
-				break
+		case "usd":
+			for _, r := range d.Payload.Rates {
+				if r.Category == "SMETransferBelow10" && r.FromCurrency.Code == 840 && r.ToCurrency.Code == 643 {
+					c.V = r.Buy
+					break
+				}
 			}
 		}
+
 		row := Row{}
 		t := time.Unix(0, d.Payload.LastUpdate.Milliseconds*int64(time.Millisecond)).UTC()
 		loc, _ := time.LoadLocation("Europe/Moscow")
@@ -110,13 +123,9 @@ func getData(w http.ResponseWriter, r *http.Request) {
 			Cell{
 				V: fmt.Sprintf("Date(%d,%d,%d,%d,%d)", t.Year(), t.Month()-1, t.Day(), t.Hour(), t.Minute()),
 			},
-			eurC,
+			c,
 			Cell{
-				V: fmt.Sprintf("%v", eurC.V),
-			},
-			usdC,
-			Cell{
-				V: fmt.Sprintf("%v", usdC.V),
+				V: fmt.Sprintf("%v", c.V),
 			},
 		}
 		dataToSend.Rows = append(dataToSend.Rows, row)
@@ -155,4 +164,12 @@ func getMongoData() []*datamodels.TinkoffData {
 		log.Fatalf("mongo find failed: %s", err.Error())
 	}
 	return result
+}
+
+func getStringFromQuery(paramName string, r *http.Request) (string, error) {
+	params := r.URL.Query()
+	if len(params[paramName]) == 0 || params[paramName][0] == "" {
+		return "", fmt.Errorf("%s can not be empty", paramName)
+	}
+	return params[paramName][0], nil
 }
