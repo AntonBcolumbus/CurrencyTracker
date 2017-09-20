@@ -159,7 +159,8 @@ func getMongoData() []*datamodels.TinkoffData {
 		"$and": []bson.M{
 			bson.M{"payload.lastupdate.milliseconds": bson.M{"$gte": millisFrom}},
 			bson.M{"payload.lastupdate.milliseconds": bson.M{"$lte": millisTo}},
-		}}).All(&result)
+		}}).Sort("payload.lastupdate.milliseconds").All(&result)
+
 	if err != nil {
 		log.Fatalf("mongo find failed: %s", err.Error())
 	}
